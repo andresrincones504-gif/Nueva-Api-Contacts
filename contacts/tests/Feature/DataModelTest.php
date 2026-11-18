@@ -5,65 +5,107 @@ use App\Models\User;
 use Database\Seeders\DatabaseSeeder;
 use Illuminate\Database\UniqueConstraintViolationException;
 
-it('relaciona un usuario con sus contactos', function () {
+test('relaciona un usuario con sus contactos', function () {
+    // Preparar
     $user = User::factory()->create();
+
+    // Actuar
     Contact::factory(3)->for($user)->create();
 
+    // Comprobar
     expect($user->contacts)->toHaveCount(3)
         ->and($user->contacts->first()->user->is($user))->toBeTrue();
 });
 
-it('hace borrado lógico de los contactos', function () {
+test('hace borrado lógico de los contactos', function () {
+    // Preparar
     $contact = Contact::factory()->create();
 
+    // Actuar
     $contact->delete();
+
+    // Comprobar
+    $this->assertSoftDeleted('contacts', ['id' => $contact->id]);
 
     expect(Contact::count())->toBe(0)
         ->and(Contact::find($contact->id))->toBeNull()
         ->and(Contact::withTrashed()->count())->toBe(1);
 });
 
-it('deja nombre y dirección visibles por defecto', function () {
+test('deja nombre y dirección del usuario visibles por defecto', function () {
+    // Actuar
     $user = User::factory()->create();
-    $contact = Contact::factory()->create();
 
-    expect($user->fresh()->name_visible)->toBeTrue()
-        ->and($user->fresh()->address_visible)->toBeTrue()
-        ->and($contact->fresh()->name_visible)->toBeTrue()
-        ->and($contact->fresh()->address_visible)->toBeTrue();
+    // Comprobar
+    $this->assertDatabaseHas('users', [
+        'id' => $user->id,
+        'name_visible' => true,
+        'address_visible' => true,
+    ]);
 });
 
-it('conoce los valores por defecto sin volver a leer la base', function () {
+test('deja nombre y dirección del contacto visibles por defecto', function () {
+    // Actuar
     $contact = Contact::factory()->create();
 
+    // Comprobar
+    $this->assertDatabaseHas('contacts', [
+        'id' => $contact->id,
+        'name_visible' => true,
+        'address_visible' => true,
+    ]);
+});
+
+test('conoce los valores por defecto sin volver a leer la base', function () {
+    // Actuar
+    $contact = Contact::factory()->create();
+
+    // Comprobar: sin fresh(), el objeto ya trae los valores
     expect($contact->name_visible)->toBeTrue()
         ->and($contact->address_visible)->toBeTrue();
 });
 
-it('no permite dos usuarios con el mismo correo', function () {
+test('no permite dos usuarios con el mismo correo', function () {
+    // Preparar
     User::factory()->create(['email' => 'repetido@contacts.test']);
-    User::factory()->create(['email' => 'repetido@contacts.test']);
-})->throws(UniqueConstraintViolationException::class);
 
-it('no permite dos usuarios con el mismo teléfono', function () {
-    User::factory()->create(['phone_number' => '3001234567']);
-    User::factory()->create(['phone_number' => '3001234567']);
-})->throws(UniqueConstraintViolationException::class);
+    // Actuar
+    $crearDuplicado = fn () => User::factory()->create(['email' => 'repetido@contacts.test']);
 
-it('borra los contactos de un usuario cuando se elimina el usuario', function () {
+    // Comprobar
+    expect($crearDuplicado)->toThrow(UniqueConstraintViolationException::class);
+    $this->assertDatabaseCount('users', 1);
+});
+
+test('no permite dos usuarios con el mismo teléfono', function () {
+    // Preparar
+    User::factory()->create(['phone_number' => '3001234567']);
+
+    // Actuar
+    $crearDuplicado = fn () => User::factory()->create(['phone_number' => '3001234567']);
+
+    // Comprobar
+    expect($crearDuplicado)->toThrow(UniqueConstraintViolationException::class);
+    $this->assertDatabaseCount('users', 1);
+});
+
+test('borra los contactos de un usuario cuando se elimina el usuario', function () {
+    // Preparar
     $user = User::factory()->create();
     Contact::factory(2)->for($user)->create();
 
+    // Actuar
     $user->delete();
 
-    expect(Contact::withTrashed()->count())->toBe(0);
+    // Comprobar: las filas desaparecen de la tabla, no solo quedan marcadas
+    $this->assertDatabaseCount('contacts', 0);
 });
 
-it('siembra dos usuarios con sus contactos', function(){
+test('siembra dos usuarios con sus contactos', function () {
+    // Actuar
     $this->seed(DatabaseSeeder::class);
 
-    expect(User::count())->toBe(2)
-        ->and(Contact::count())->toBe(8);
+    // Comprobar
+    $this->assertDatabaseCount('users', 2);
+    $this->assertDatabaseCount('contacts', 8);
 });
-
-
