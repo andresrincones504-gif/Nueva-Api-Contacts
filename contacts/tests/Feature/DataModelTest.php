@@ -59,9 +59,11 @@ it('borra los contactos de un usuario cuando se elimina el usuario', function ()
     expect(Contact::withTrashed()->count())->toBe(0);
 });
 
-it('siembra dos usuarios con sus contactos', function () {
+it('siembra dos usuarios con sus contactos', function(){
     $this->seed(DatabaseSeeder::class);
 
     expect(User::count())->toBe(2)
         ->and(Contact::count())->toBe(8);
 });
+
+
